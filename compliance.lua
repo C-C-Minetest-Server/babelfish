@@ -5,16 +5,16 @@
 -- in a LICENSE.txt file
 -- If not, please see https://www.gnu.org/licenses/lgpl-3.0.html
 
-local helponjoin = minetest.setting_getbool("babelfish.helponjoin") or false
+local helponjoin = core.setting_getbool("babelfish.helponjoin") or false
 
-minetest.register_on_joinplayer(function(player)
+core.register_on_joinplayer(function(player)
 	local playername = player:get_player_name()
 
 	if babel.compliance then
-		minetest.chat_send_player(playername, babel.compliance)
+		core.chat_send_player(playername, babel.compliance)
 	end
 	if helponjoin then
-		minetest.chat_send_player(playername, "This is an multilingual server!")
-		minetest.chat_send_player(playername, "Type '/help bb' and '/help babel' for more information on translations.")
+		core.chat_send_player(playername, "This is an multilingual server!")
+		core.chat_send_player(playername, "Type '/help bb' and '/help babel' for more information on translations.")
 	end
 end)

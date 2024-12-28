@@ -7,46 +7,36 @@
 
 babel = {}
 
-local modpath = minetest.get_modpath("babelfish")
+local modpath = core.get_modpath("babelfish")
 dofile(modpath.."/chat.lua" )
 dofile(modpath.."/utilities.lua" )
 dofile(modpath.."/persistence.lua" )
 
-local langprefs = minetest.get_worldpath().."/babel_langprefs"
-local engine = minetest.setting_get("babelfish.engine") or "yandex"
-babel.key = minetest.setting_get("babelfish.key")
-babel.defaultlang = minetest.setting_get("babelfish.defaultlang") or "en"
+local langprefs = core.get_worldpath().."/babel_langprefs"
+local engine = core.setting_get("babelfish.engine") or "yandex"
+babel.key = core.setting_get("babelfish.key")
+babel.defaultlang = core.setting_get("babelfish.defaultlang") or "en"
 
-minetest.register_privilege("babelmoderator")
+core.register_privilege("babelmoderator")
 
 local chat_history = {}
 local player_pref_language = {}
 
 -- ===== SECURITY ======
 
-local ie = minetest.request_insecure_environment()
+if not babel.key then engine = "none" end
+dofile(modpath.."/"..engine.."_engine.lua")
 
-if not ie then
-	error("Could not get secure environment. Add babelfish to secure.trusted_mods ")
-end
-
-local oldrequire = require
-require = ie.require -- override require so that system libraries being loaded can benefit
-
-	if not babel.key then engine = "none" end
-	dofile(modpath.."/"..engine.."_engine.lua")
-
-	local httpapitable = minetest.request_http_api()
-	babel.register_http(httpapitable)
-
-require = oldrequire -- restore the sandbox's require
+local httpapitable = assert(core.request_http_api(),
+	"Could not get HTTP API table. Add babelfish to secure.http_mods")
+babel.register_http(httpapitable)
 
 -- =====================
 
 local function prefsave()
-	local serdata = minetest.serialize(player_pref_language)
+	local serdata = core.serialize(player_pref_language)
 	if not serdata then
-		minetest.log("error", "[babelfish] Data serialization failed")
+		core.log("error", "[babelfish] Data serialization failed")
 		return
 	end
 	local file, err = io.open(langprefs, "w")
@@ -60,10 +50,10 @@ end
 local function prefload()
 	local file, err = io.open(langprefs, "r")
 	if err then
-		minetest.log("error", "[babelfish] Data read failed")
+		core.log("error", "[babelfish] Data read failed")
 		return
 	end
-	player_pref_language = minetest.deserialize(file:read("*a")) or {}
+	player_pref_language = core.deserialize(file:read("*a")) or {}
 	file:close()
 end
 
@@ -81,10 +71,6 @@ end
 
 -- =====================================================================/
 
-minetest.register_on_chat_message(function(player, message)
-	chat_history[player] = message
-end)
-
 local function components(mystring)
 	local iter = mystring:gmatch("%S+")
 	local targetlang = iter() or ""
@@ -94,7 +80,7 @@ local function components(mystring)
 end
 
 local function validate_player(playername)
-	if minetest.get_player_by_name(playername) then
+	if core.get_player_by_name(playername) then
 		return true
 	end
 	return false
@@ -104,21 +90,12 @@ local function dotranslate(lang, phrase, handler)
 	return babel:translate(phrase, lang, handler)
 end
 
--- Shortcut translation
--- Send a message like "Hello everyone ! %fr"
--- The message is broadcast in original form, then in French
-minetest.register_on_chat_message(function(player, message)
-	if not minetest.check_player_privs(player, {shout = true}) then
-		return
-	end
-
+local function check_message(message)
 	-- Search for "%" token
 	local n,m = message:find("%%..")
 	local targetlang = nil
 	local targetphrase = message
 	if n then
-		local sfront = message:sub(1, n-1)
-		local sback = message:sub(m+1, message:len() )
 		targetlang = message:sub(n+1, m) -- Removes '%' token
 		targetphrase = message:gsub("%%"..targetlang,'',1)
 	end
@@ -131,17 +108,63 @@ minetest.register_on_chat_message(function(player, message)
 	local validation = babel:validate_lang(targetlang)
 
 	if validation ~= true then
-		babel.chat_send_player(player, validation)
-
-	else
-		dotranslate(targetlang, targetphrase, function(newphrase)
-			babel.chat_send_all("["..babel.engine.." "..player.."]: "..newphrase)
-			minetest.log("action", player.." CHAT ["..babel.engine.."]: "..newphrase)
-		end)
+		return false, validation
 	end
-end)
+
+	return targetlang, targetphrase
+end
+
+-- Shortcut translation
+-- Send a message like "Hello everyone ! %fr"
+-- The message is broadcast in original form, then in French
+if core.global_exists("beerchat") then
+	beerchat.register_callback("before_send_on_channel", function(name, msg)
+		local message = msg.message
+		if msg.channel == beerchat.main_channel_name then
+			chat_history[name] = message
+		end
+
+		local targetlang, targetphrase = check_message(message)
+		if not targetlang then
+			if targetphrase then
+				babel.chat_send_player(name, targetphrase)
+			end
+		else
+			dotranslate(targetlang, targetphrase, function(newphrase)
+				beerchat.send_on_channel({
+					name = name,
+					channel = msg.channel,
+					message = "[" .. babel.engine .. "]: " .. newphrase,
+				})
+			end)
+		end
+	end)
+else
+	core.register_on_chat_message(function(player, message)
+		if not core.check_player_privs(player, { shout = true }) then
+			return
+		end
+
+		chat_history[player] = message
+
+		local targetlang, targetphrase = check_message(message)
+		if not targetlang then
+			babel.chat_send_player(player, targetphrase)
+		else
+			dotranslate(targetlang, targetphrase, function(newphrase)
+				babel.chat_send_all("[" .. babel.engine .. " " .. player .. "]: " .. newphrase)
+				core.log("action", player .. " CHAT [" .. babel.engine .. "]: " .. newphrase)
+			end)
+		end
+	end)
+end
 
 local function f_babel(player, argstring)
+	if not beerchat.is_player_subscribed_to_channel(player, beerchat.main_channel_name) then
+		-- beerchat is present, so we can't use the chat history
+		babel.chat_send_player(player, "You are not in the main channel!")
+		return
+	end
 	local targetplayer = argstring
 	if not player_pref_language[player] then
 		player_pref_language[player] = babel.defaultlang
@@ -177,7 +200,7 @@ local function f_babelshout(player, argstring)
 
 	dotranslate(targetlang, targetphrase, function(newphrase)
 		babel.chat_send_all("["..babel.engine.." "..player.."]: "..newphrase)
-		minetest.log("action", player.." CHAT ["..babel.engine.."]: "..newphrase)
+		core.log("action", player.." CHAT ["..babel.engine.."]: "..newphrase)
 	end)
 end
 
@@ -199,12 +222,12 @@ local function f_babelmsg(player, argstring)
 	
 	dotranslate(targetlang, targetphrase, function(newphrase)
 		babel.chat_send_player(targetplayer, "["..babel.engine.." PM from "..player.."]: "..newphrase)
-		minetest.log("action", player.." PM to "..targetplayer.." ["..babel.engine.."]: "..newphrase)
+		core.log("action", player.." PM to "..targetplayer.." ["..babel.engine.."]: "..newphrase)
 	end)
 end
 
 local function setplayerlanguage(tplayer, langcode)
-	if minetest.get_player_by_name(tplayer) then
+	if core.get_player_by_name(tplayer) then
 		player_pref_language[tplayer] = langcode
 		prefsave()
 	end
@@ -214,7 +237,7 @@ local function getplayerlanguage(tplayer)
 	return player_pref_language[tplayer]
 end
 
-minetest.register_chatcommand("bblang", {
+core.register_chatcommand("bblang", {
 	description = "Set your preferred language",
 	func = function(player,args)
 		local validation = babel:validate_lang(args)
@@ -228,27 +251,27 @@ minetest.register_chatcommand("bblang", {
 	end
 })
 
-minetest.register_chatcommand("bbcodes", {
+core.register_chatcommand("bbcodes", {
 	description = "List the available language codes",
 	func = function(player,command)
-		minetest.chat_send_player(player,dump(babel.langcodes))
+		core.chat_send_player(player,dump(babel.langcodes))
 	end
 })
 
-minetest.register_chatcommand("babel", {
+core.register_chatcommand("babel", {
 	description = "Translate a player's last chat message. Use /bblang to set your language",
 	params = "<playername>",
 	func = f_babel
 })
 
-minetest.register_chatcommand("bb", {
+core.register_chatcommand("bb", {
 	description = "Translate a sentence and transmit it to everybody",
 	params = "<lang-code> <sentence>",
 	func = f_babelshout,
 	privs = {shout = true},
 })
 
-minetest.register_chatcommand("bmsg", {
+core.register_chatcommand("bmsg", {
 	description = "Send a private message to a player, in their preferred language",
 	params = "<player> <sentence>",
 	privs = {shout = true},
@@ -257,7 +280,7 @@ minetest.register_chatcommand("bmsg", {
 
 -- Admin commands
 
-minetest.register_chatcommand("bbset", {
+core.register_chatcommand("bbset", {
 	description = "Set a player's preferred language (if they do not know how)",
 	params = "<player> <language-code>",
 	privs = {babelmoderator = true},
@@ -269,7 +292,7 @@ minetest.register_chatcommand("bbset", {
 
 -- Set player's default language
 
-minetest.register_on_joinplayer(function(player, ip)
+core.register_on_joinplayer(function(player, ip)
 	local playername = player:get_player_name()
 	if not getplayerlanguage(playername) then
 		setplayerlanguage(playername, babel.defaultlang)
@@ -277,6 +300,6 @@ minetest.register_on_joinplayer(function(player, ip)
 end)
 
 -- Display help string, and compliance if set
-dofile(minetest.get_modpath("babelfish").."/compliance.lua")
+dofile(core.get_modpath("babelfish").."/compliance.lua")
 
 prefload()

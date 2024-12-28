@@ -46,7 +46,7 @@ function babel:translate(phrase, lang, handler)
 			handler(extract_phrase(htresponse.data) )
 		else
 			handler("Failed request")
-			minetest.log("error", "Error on requesting -- "..dump(htresponse))
+			core.log("error", "Error on requesting -- "..dump(htresponse))
 		end
 	end)
 end

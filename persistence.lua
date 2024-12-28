@@ -1,16 +1,16 @@
 -- Functions to implement persistent data
 
 local phrasebank = {}
-local phrasebankfile = minetest.get_worldpath().."/phrasebank.ser"
+local phrasebankfile = core.get_worldpath().."/phrasebank.ser"
 
 local original = "original"
 
 -- File manip
 
 local function ph_save()
-	local serdata = minetest.serialize(phrasebank)
+	local serdata = core.serialize(phrasebank)
 	if not serdata then
-		minetest.log("info", "[babelfish] Phrasebank serialization failed")
+		core.log("info", "[babelfish] Phrasebank serialization failed")
 		return
 	end
 	local file, err = io.open(phrasebankfile, "w")
@@ -24,10 +24,10 @@ end
 local function ph_load()
 	local file, err = io.open(phrasebankfile, "r")
 	if err then
-		minetest.log("info", "[babelfish] No phrasebank found")
+		core.log("info", "[babelfish] No phrasebank found")
 		return
 	end
-	phrasebank = minetest.deserialize(file:read("*a"))
+	phrasebank = core.deserialize(file:read("*a"))
 	file:close()
 end
 

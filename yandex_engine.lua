@@ -7,8 +7,6 @@
 
 babel.compliance = "Translations are Powered by Yandex.Translate"
 
-local json = require("json")
-
 local httpapi
 
 function babel.register_http(hat)
@@ -109,25 +107,44 @@ babel.langcodes = {
 	yi = "Yiddish",
 }
 
-local serviceurl = "https://translate.yandex.net/api/v1.5/tr.json/translate?"
+local serviceurl = "https://translate.api.cloud.yandex.net/translate/v2/translate"
 
-local function extract_phrase(json_string)
-	local jsontable = json.decode(json_string)
-	return jsontable.text[1]
-end
+function babel.translate(_, phrase, lang, handler)
+	local request_header = {
+		"Content-Type: application/json",
+		"Authorization: Api-Key " .. babel.key,
+	}
+	local request_data = {
+		texts = {phrase},
+		targetLanguageCode = lang,
+		speller = true
+	}
 
-function babel.translate(self, phrase, lang, handler)
-	local transurl = serviceurl ..
-		"key="..babel.key.."&"..
-		"text="..babel.sanitize(phrase).."&"..
-		"lang="..babel.sanitize(lang)
-	
-	httpapi.fetch({url = transurl}, function(htresponse)
+	httpapi.fetch({
+		url = serviceurl,
+		timeout = 10,
+		method = "POST",
+		post_data = core.write_json(request_data),
+		extra_headers = request_header,
+	}, function(htresponse)
 		if htresponse.succeeded then
-			handler(extract_phrase(htresponse.data) )
+			local jsontable, jsonerr = core.parse_json(htresponse.data, nil, true)
+			if jsonerr then
+				core.log("error", "Failed to parse Yandex return: "..jsonerr)
+				handler("Failed request")
+				return
+			end
+
+			if jsontable.code then
+				core.log("error", "Yandex returned error " .. jsontable.code .. ": "..jsontable.message)
+				handler("Failed request")
+				return
+			end
+
+			return jsontable.translations[1].text
 		else
 			handler("Failed request") -- FIXME this returns the literal string to the client. Not good.
-			minetest.log("error", "Error on requesting -- "..dump(htresponse))
+			core.log("error", "Error on requesting -- "..dump(htresponse))
 		end
 	end)
 end

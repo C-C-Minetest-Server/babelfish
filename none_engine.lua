@@ -21,6 +21,6 @@ function babel.validate_lang()
 	return "Not configured"
 end
 
-function babel.translate(self,phrase,lang)
+function babel:translate()
 	babel.printresult("Not configured")
 end

@@ -51,26 +51,6 @@ Will send
 	* set a player's language code
 	* requires `babelmoderator` privilege
 
-## Requirements
-
-The server requires `lua-json` to be installed, as well as adding the mod to the trusted mods for security purposes. For example when adding both `babelfish` and `irc` as trusted mods:
-
-	secure.trusted_mods = irc,babelfish
-
-Otherwise, you may get errors like `httpapi not defined`
-
-On Ubuntu/Debian, Minetest does not pick up on packages in `/usr/local/lib` ; instead you need to install luarocks and then use that
-
-	sudo apt-get install luarocks gcc
-	sudo luarocks install luajson
-	sudo apt-get remove gcc
-
-On some distributions, the following is sufficient:
-
-	sudo apt-get install lua-json
-
-Try each before filing a bug...
-
 # Configuration
 
 (*Required*): Add your API key to `minetest.conf` under `babelfish.key`
