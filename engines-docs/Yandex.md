@@ -2,7 +2,7 @@
 
 The Yandex engine uses Yandex.Translate's services.
 
-No other configuration than the API key is needed.
+No other configuration than the API key of a service account is needed.
 
 ## Obtaining the API key
 

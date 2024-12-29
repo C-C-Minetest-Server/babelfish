@@ -7,12 +7,14 @@
 
 babel.engine = "none"
 
+function babel.register_http() end
+
 babel.langcodes = {}
 
 function babel.validate_lang()
 	return "Not configured"
 end
 
-function babel.translate()
-	babel.printresult("Not configured")
+function babel.translate(_, _, _, handler)
+	handler("Not configured")
 end

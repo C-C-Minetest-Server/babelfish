@@ -24,12 +24,14 @@ local player_pref_language = {}
 
 -- ===== SECURITY ======
 
-if not babel.key then engine = "none" end
-dofile(modpath .. "/" .. engine .. "_engine.lua")
+if not babel.key then
+	core.log("error", "Babelfish engine key undefined. Translations will be unavaliable.")
+	engine = "none"
+end
+dofile(modpath .. "/engines/" .. engine .. ".lua")
 
-local httpapitable = assert(core.request_http_api(),
-	"Could not get HTTP API table. Add babelfish to secure.http_mods")
-babel.register_http(httpapitable)
+babel.register_http(assert(core.request_http_api(),
+	"Could not get HTTP API table. Add babelfish to secure.http_mods"))
 
 -- =====================
 
