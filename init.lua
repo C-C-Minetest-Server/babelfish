@@ -92,33 +92,41 @@ end
 
 local function check_message(message)
 	-- Search for "%" token
-	local n,m = message:find("%%..")
-	local targetlang = nil
-	local targetphrase = message
-	if n then
-		targetlang = message:sub(n+1, m) -- Removes '%' token
-		targetphrase = message:gsub("%%"..targetlang,'',1)
+	local _, _, targetlang = message:find("%%([a-zA-Z-_]+)")
+	if targetlang then
+		local targetphrase = message:gsub("%%"..targetlang,'',1)
+		local validation = babel:validate_lang(targetlang)
+
+		if validation ~= true then
+			return false, validation
+		end
+		return targetlang, targetphrase
 	end
-
-	if not targetlang then
-		return false
-	end
-
-	-- True, or error string
-	local validation = babel:validate_lang(targetlang)
-
-	if validation ~= true then
-		return false, validation
-	end
-
-	return targetlang, targetphrase
+	return false
 end
+
+local dosend
 
 -- Shortcut translation
 -- Send a message like "Hello everyone ! %fr"
 -- The message is broadcast in original form, then in French
 if core.global_exists("beerchat") then
+	dosend = function(name, message, channel)
+		if not channel then
+			channel = beerchat.get_player_channel(name)
+			if not channel then
+				beerchat.fix_player_channel(name, true)
+			end
+		end
+		beerchat.send_on_channel({
+			name = name,
+			channel = channel,
+			message = "[" .. babel.engine .. "]: " .. message,
+			_supress_babelfish = true,
+		})
+	end
 	beerchat.register_callback("before_send_on_channel", function(name, msg)
+		if msg._supress_babelfish then return end
 		local message = msg.message
 		if msg.channel == beerchat.main_channel_name then
 			chat_history[name] = message
@@ -131,15 +139,14 @@ if core.global_exists("beerchat") then
 			end
 		else
 			dotranslate(targetlang, targetphrase, function(newphrase)
-				beerchat.send_on_channel({
-					name = name,
-					channel = msg.channel,
-					message = "[" .. babel.engine .. "]: " .. newphrase,
-				})
+				dosend(name, newphrase, msg.channel)
 			end)
 		end
 	end)
 else
+	dosend = function(name, _, message)
+		babel.chat_send_all("[" .. babel.engine .. " " .. name .. "]: " .. message)
+	end
 	core.register_on_chat_message(function(player, message)
 		if not core.check_player_privs(player, { shout = true }) then
 			return
@@ -152,7 +159,7 @@ else
 			babel.chat_send_player(player, targetphrase)
 		else
 			dotranslate(targetlang, targetphrase, function(newphrase)
-				babel.chat_send_all("[" .. babel.engine .. " " .. player .. "]: " .. newphrase)
+				dosend(player, newphrase)
 				core.log("action", player .. " CHAT [" .. babel.engine .. "]: " .. newphrase)
 			end)
 		end
@@ -199,7 +206,7 @@ local function f_babelshout(player, argstring)
 	end
 
 	dotranslate(targetlang, targetphrase, function(newphrase)
-		babel.chat_send_all("["..babel.engine.." "..player.."]: "..newphrase)
+		dosend(player, newphrase)
 		core.log("action", player.." CHAT ["..babel.engine.."]: "..newphrase)
 	end)
 end
