@@ -115,7 +115,7 @@ function babel.translate(_, phrase, lang, handler)
 		"Authorization: Api-Key " .. babel.key,
 	}
 	local request_data = {
-		texts = {phrase},
+		texts = { phrase },
 		targetLanguageCode = lang,
 		speller = true
 	}
@@ -130,13 +130,13 @@ function babel.translate(_, phrase, lang, handler)
 		if htresponse.succeeded then
 			local jsontable, jsonerr = core.parse_json(htresponse.data, nil, true)
 			if jsonerr then
-				core.log("error", "Failed to parse Yandex return: "..jsonerr)
+				core.log("error", "Failed to parse Yandex return: " .. jsonerr)
 				handler("Failed request")
 				return
 			end
 
 			if jsontable.code then
-				core.log("error", "Yandex returned error " .. jsontable.code .. ": "..jsontable.message)
+				core.log("error", "Yandex returned error " .. jsontable.code .. ": " .. jsontable.message)
 				handler("Failed request")
 				return
 			end
@@ -144,8 +144,7 @@ function babel.translate(_, phrase, lang, handler)
 			return jsontable.translations[1].text
 		else
 			handler("Failed request") -- FIXME this returns the literal string to the client. Not good.
-			core.log("error", "Error on requesting -- "..dump(htresponse))
+			core.log("error", "Error on requesting -- " .. dump(htresponse))
 		end
 	end)
 end
-

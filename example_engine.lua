@@ -1,5 +1,6 @@
 -- Example Engine File
 -- You can use this file as an example to base your own engine off of
+-- luacheck: ignore
 
 -- Compliance notes
 -- If the web service requires translations to be announced,
@@ -36,17 +37,17 @@ function babel:translate(phrase, lang, handler)
 	-- We sanitize both lang and phrase as they can be player-entered data
 	-- For example:
 	local transurl = serviceurl ..
-		"key="..babel.key.."&"..
-		"text="..babel.sanitize(phrase).."&"..
-		"lang="..babel.sanitize(lang)
-	
+		"key=" .. babel.key .. "&" ..
+		"text=" .. babel.sanitize(phrase) .. "&" ..
+		"lang=" .. babel.sanitize(lang)
+
 	-- make the request
-	httpapi.fetch({url = transurl}, function(htresponse)
+	httpapi.fetch({ url = transurl }, function(htresponse)
 		if htresponse.succeeded then
-			handler(extract_phrase(htresponse.data) )
+			handler(extract_phrase(htresponse.data))
 		else
 			handler("Failed request")
-			core.log("error", "Error on requesting -- "..dump(htresponse))
+			core.log("error", "Error on requesting -- " .. dump(htresponse))
 		end
 	end)
 end

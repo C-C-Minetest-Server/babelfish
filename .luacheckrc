@@ -3,10 +3,12 @@ globals = {
 }
 
 read_globals = {
-    "DIR_DELIM", "INIT",
+    "DIR_DELIM",
+    "INIT",
 
     "core",
-    "dump", "dump2",
+    "dump",
+    "dump2",
 
     "Raycast",
     "Settings",

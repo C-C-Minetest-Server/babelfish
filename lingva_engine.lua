@@ -78,7 +78,7 @@ function babel.register_http(hat)
                     for _, alias in ipairs(valid_alias[langdata.code]) do
                         langcode_alias[alias] = langdata.code
                         babel.langcodes[alias] = langdata.name
-                        alias_log_strings[#alias_log_strings+1] =
+                        alias_log_strings[#alias_log_strings + 1] =
                             alias .. " -> " .. langdata.code
                     end
                 end

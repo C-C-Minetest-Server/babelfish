@@ -8,11 +8,11 @@
 babel = {}
 
 local modpath = core.get_modpath("babelfish")
-dofile(modpath.."/chat.lua" )
-dofile(modpath.."/utilities.lua" )
-dofile(modpath.."/persistence.lua" )
+dofile(modpath .. "/chat.lua")
+dofile(modpath .. "/utilities.lua")
+dofile(modpath .. "/persistence.lua")
 
-local langprefs = core.get_worldpath().."/babel_langprefs"
+local langprefs = core.get_worldpath() .. "/babel_langprefs"
 local engine = core.setting_get("babelfish.engine") or "yandex"
 babel.key = core.setting_get("babelfish.key")
 babel.defaultlang = core.setting_get("babelfish.defaultlang") or "en"
@@ -25,7 +25,7 @@ local player_pref_language = {}
 -- ===== SECURITY ======
 
 if not babel.key then engine = "none" end
-dofile(modpath.."/"..engine.."_engine.lua")
+dofile(modpath .. "/" .. engine .. "_engine.lua")
 
 local httpapitable = assert(core.request_http_api(),
 	"Could not get HTTP API table. Add babelfish to secure.http_mods")
@@ -59,14 +59,14 @@ end
 
 -- ========================== Language engine and overridable validation
 
-function babel.validate_lang(self, langstring)
-	for target, langname in pairs(babel.langcodes) do
+function babel.validate_lang(_, langstring)
+	for target, _ in pairs(babel.langcodes) do
 		if target == langstring then
 			return true
 		end
 	end
 
-	return tostring(langstring).." is not a recognized language"
+	return tostring(langstring) .. " is not a recognized language"
 end
 
 -- =====================================================================/
@@ -74,7 +74,7 @@ end
 local function components(mystring)
 	local iter = mystring:gmatch("%S+")
 	local targetlang = iter() or ""
-	local targetphrase = mystring:gsub("^"..targetlang.." ", "")
+	local targetphrase = mystring:gsub("^" .. targetlang .. " ", "")
 
 	return targetlang, targetphrase
 end
@@ -94,7 +94,7 @@ local function check_message(message)
 	-- Search for "%" token
 	local _, _, targetlang = message:find("%%([a-zA-Z-_]+)")
 	if targetlang then
-		local targetphrase = message:gsub("%%"..targetlang,'',1)
+		local targetphrase = message:gsub("%%" .. targetlang, '', 1)
 		local validation = babel:validate_lang(targetlang)
 
 		if validation ~= true then
@@ -135,7 +135,7 @@ if core.global_exists("beerchat") then
 		local targetlang, targetphrase = check_message(message)
 		if not targetlang then
 			if targetphrase then
-				babel.chat_send_player(name, targetphrase)
+				core.chat_send_player(name, targetphrase)
 			end
 		else
 			dotranslate(targetlang, targetphrase, function(newphrase)
@@ -156,7 +156,7 @@ else
 
 		local targetlang, targetphrase = check_message(message)
 		if not targetlang then
-			babel.chat_send_player(player, targetphrase)
+			core.chat_send_player(player, targetphrase)
 		else
 			dotranslate(targetlang, targetphrase, function(newphrase)
 				dosend(player, newphrase)
@@ -167,11 +167,6 @@ else
 end
 
 local function f_babel(player, argstring)
-	if not beerchat.is_player_subscribed_to_channel(player, beerchat.main_channel_name) then
-		-- beerchat is present, so we can't use the chat history
-		babel.chat_send_player(player, "You are not in the main channel!")
-		return
-	end
 	local targetplayer = argstring
 	if not player_pref_language[player] then
 		player_pref_language[player] = babel.defaultlang
@@ -181,18 +176,27 @@ local function f_babel(player, argstring)
 
 	local validation = babel:validate_lang(targetlang)
 	if validation ~= true then
-		babel.chat_send_player(player, validation)
-		return
+		return false, validation
 	end
 
 	if not chat_history[targetplayer] then
-		babel.chat_send_player(player, targetplayer.." has not said anything")
-		return
+		return false, targetplayer .. " has not said anything"
 	end
 
 	dotranslate(targetlang, chat_history[targetplayer], function(newphrase)
-		babel.chat_send_player(player, "["..babel.engine.."]: "..newphrase)
+		core.chat_send_player(player, "[" .. babel.engine .. "]: " .. newphrase)
 	end)
+	return true
+end
+
+if core.global_exists("beerchat") then
+	local old_babel = f_babel
+	f_babel = function(player, argstring)
+		if not beerchat.is_player_subscribed_to_channel(player, beerchat.main_channel_name) then
+			return false, "You are not in the main channel!"
+		end
+		return old_babel(player, argstring)
+	end
 end
 
 local function f_babelshout(player, argstring)
@@ -201,14 +205,14 @@ local function f_babelshout(player, argstring)
 
 	local validation = babel:validate_lang(targetlang)
 	if validation ~= true then
-		babel.chat_send_player(player, validation)
-		return
+		return false, validation
 	end
 
 	dotranslate(targetlang, targetphrase, function(newphrase)
 		dosend(player, newphrase)
-		core.log("action", player.." CHAT ["..babel.engine.."]: "..newphrase)
+		core.log("action", player .. " CHAT [" .. babel.engine .. "]: " .. newphrase)
 	end)
+	return true
 end
 
 local function f_babelmsg(player, argstring)
@@ -218,19 +222,19 @@ local function f_babelmsg(player, argstring)
 
 	local validation = babel:validate_lang(targetlang)
 	if validation ~= true then
-		babel.chat_send_player(player, validation)
-		return
+		return false, validation
 	end
 
 	if not validate_player(targetplayer) then
-		babel.chat_send_player(player, targetplayer.." is not a connected player")
-		return
+		return false, targetplayer .. " is not a connected player"
 	end
-	
+
 	dotranslate(targetlang, targetphrase, function(newphrase)
-		babel.chat_send_player(targetplayer, "["..babel.engine.." PM from "..player.."]: "..newphrase)
-		core.log("action", player.." PM to "..targetplayer.." ["..babel.engine.."]: "..newphrase)
+		core.chat_send_player(targetplayer, "[" .. babel.engine .. " PM from " .. player .. "]: " .. newphrase)
+		core.log("action", player .. " PM to " .. targetplayer .. " [" .. babel.engine .. "]: " .. newphrase)
+		core.chat_send_player(player, "[" .. babel.engine .. " PM to " .. targetplayer .. "]: " .. newphrase)
 	end)
+	return true
 end
 
 local function setplayerlanguage(tplayer, langcode)
@@ -246,22 +250,21 @@ end
 
 core.register_chatcommand("bblang", {
 	description = "Set your preferred language",
-	func = function(player,args)
+	func = function(player, args)
 		local validation = babel:validate_lang(args)
 		if validation ~= true then
-			babel.chat_send_player(player, validation)
-			return
+			return false, validation
 		else
 			setplayerlanguage(player, args) -- FIXME this should use the above pref functions
-			babel.chat_send_player(player, args.." : OK" )
+			return true, args .. " : OK"
 		end
 	end
 })
 
 core.register_chatcommand("bbcodes", {
 	description = "List the available language codes",
-	func = function(player,command)
-		core.chat_send_player(player,dump(babel.langcodes))
+	func = function()
+		return true, dump(babel.langcodes)
 	end
 })
 
@@ -275,13 +278,13 @@ core.register_chatcommand("bb", {
 	description = "Translate a sentence and transmit it to everybody",
 	params = "<lang-code> <sentence>",
 	func = f_babelshout,
-	privs = {shout = true},
+	privs = { shout = true },
 })
 
 core.register_chatcommand("bmsg", {
 	description = "Send a private message to a player, in their preferred language",
 	params = "<player> <sentence>",
-	privs = {shout = true},
+	privs = { shout = true },
 	func = f_babelmsg
 })
 
@@ -290,8 +293,8 @@ core.register_chatcommand("bmsg", {
 core.register_chatcommand("bbset", {
 	description = "Set a player's preferred language (if they do not know how)",
 	params = "<player> <language-code>",
-	privs = {babelmoderator = true},
-	func = function(player, message)
+	privs = { babelmoderator = true },
+	func = function(_, message)
 		local tplayer, langcode = components(message)
 		setplayerlanguage(tplayer, langcode)
 	end,
@@ -299,7 +302,7 @@ core.register_chatcommand("bbset", {
 
 -- Set player's default language
 
-core.register_on_joinplayer(function(player, ip)
+core.register_on_joinplayer(function(player)
 	local playername = player:get_player_name()
 	if not getplayerlanguage(playername) then
 		setplayerlanguage(playername, babel.defaultlang)
@@ -307,6 +310,6 @@ core.register_on_joinplayer(function(player, ip)
 end)
 
 -- Display help string, and compliance if set
-dofile(core.get_modpath("babelfish").."/compliance.lua")
+dofile(core.get_modpath("babelfish") .. "/compliance.lua")
 
 prefload()

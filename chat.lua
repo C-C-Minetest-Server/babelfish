@@ -7,10 +7,6 @@
 
 local irct = core.get_modpath("irc")
 
-function babel.chat_send_player(player,message)
-	core.chat_send_player(player,message)
-end
-
 function babel.chat_send_all(message)
 	if irct then
 		irc:say(message)

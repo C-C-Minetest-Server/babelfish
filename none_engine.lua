@@ -7,20 +7,12 @@
 
 babel.engine = "none"
 
-local httpapi
-
-function babel.register_http(hat)
-	httpapi = hat
-end
-
 babel.langcodes = {}
-
-local serviceurl = "https://example.com"
 
 function babel.validate_lang()
 	return "Not configured"
 end
 
-function babel:translate()
+function babel.translate()
 	babel.printresult("Not configured")
 end
